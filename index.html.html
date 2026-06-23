@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pirineos en Autocaravana · Junio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root {
+    --pine: #1a3a2a; --forest: #2d5a3d; --moss: #4a7c59;
+    --sage: #8aab8a; --stone: #c4b89a; --cream: #f5f0e8;
+    --snow: #faf8f5; --amber: #d4863a; --sky: #6b9baf; --text: #1c1c1c;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--snow); color:var(--text); min-height:100vh; }
+
+  header {
+    background:var(--pine); color:var(--cream);
+    padding:24px 32px 20px; display:flex; align-items:flex-end;
+    justify-content:space-between; position:relative; overflow:hidden;
+  }
+  header::before {
+    content:''; position:absolute; top:-40px; right:-60px;
+    width:300px; height:200px;
+    background:radial-gradient(ellipse,rgba(74,124,89,.3) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  .header-title h1 { font-family:'Playfair Display',serif; font-size:1.9rem; font-weight:700; letter-spacing:-.5px; line-height:1.1; }
+  .header-title h1 em { font-style:italic; color:var(--sage); }
+  .header-title p { font-size:.78rem; font-weight:300; letter-spacing:2px; text-transform:uppercase; color:var(--stone); margin-top:6px; }
+  .header-meta { text-align:right; font-size:.75rem; color:var(--sage); font-weight:300; letter-spacing:.5px; line-height:1.8; }
+  .header-meta strong { color:var(--cream); font-weight:500; }
+
+  .layout { display:grid; grid-template-columns:320px 1fr; height:calc(100vh - 88px); }
+
+  .sidebar {
+    background:var(--cream); border-right:1px solid rgba(0,0,0,.08);
+    overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--sage) transparent;
+  }
+  .sidebar::-webkit-scrollbar { width:4px; }
+  .sidebar::-webkit-scrollbar-thumb { background:var(--sage); border-radius:2px; }
+
+  .day-block {
+    border-bottom:1px solid rgba(0,0,0,.07); padding:18px 20px;
+    cursor:pointer; transition:background .2s; position:relative;
+  }
+  .day-block:hover { background:rgba(255,255,255,.7); }
+  .day-block.active { background:white; }
+  .day-block.active::before {
+    content:''; position:absolute; left:0; top:0; bottom:0;
+    width:3px; background:var(--forest);
+  }
+  .day-label { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .day-badge {
+    background:var(--pine); color:var(--cream); font-size:.65rem;
+    font-weight:500; letter-spacing:1.5px; text-transform:uppercase;
+    padding:3px 8px; border-radius:3px;
+  }
+  .day-name { font-family:'Playfair Display',serif; font-size:1rem; font-weight:700; color:var(--pine); }
+
+  .stops-list { display:flex; flex-direction:column; gap:8px; }
+  .stop-item {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:8px 10px; border-radius:6px; transition:background .15s; cursor:pointer;
+  }
+  .stop-item:hover { background:rgba(74,124,89,.1); }
+  .stop-item.highlighted { background:rgba(74,124,89,.15); }
+
+  .stop-marker {
+    width:22px; height:22px; border-radius:50%; display:flex;
+    align-items:center; justify-content:center; font-size:11px;
+    flex-shrink:0; margin-top:1px; font-weight:600; color:white;
+  }
+  .stop-info h4 { font-size:.82rem; font-weight:500; color:var(--pine); line-height:1.3; }
+  .stop-info p { font-size:.72rem; color:#666; margin-top:2px; font-weight:300; line-height:1.4; }
+  .stop-tag {
+    display:inline-block; font-size:.6rem; letter-spacing:.8px;
+    text-transform:uppercase; padding:1px 5px; border-radius:2px;
+    margin-top:3px; font-weight:500;
+  }
+  .tag-pueblo { background:rgba(212,134,58,.15); color:var(--amber); }
+  .tag-naturaleza { background:rgba(74,124,89,.15); color:var(--forest); }
+  .tag-noche { background:rgba(107,155,175,.15); color:var(--sky); }
+  .tag-perro { background:rgba(154,79,181,.15); color:#9a4fb5; }
+
+  .dog-section {
+    margin-top:8px; padding-top:8px;
+    border-top:1px dashed rgba(154,79,181,.25);
+  }
+  .dog-section-label {
+    font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px;
+    color:#9a4fb5; margin-bottom:4px; padding-left:10px;
+  }
+
+  .route-info {
+    font-size:.7rem; color:#888; margin-top:10px; padding-top:10px;
+    border-top:1px dashed rgba(0,0,0,.1); display:flex; align-items:center; gap:5px;
+  }
+
+  .legend { padding:16px 20px; background:white; border-bottom:1px solid rgba(0,0,0,.07); }
+  .legend-title { font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; color:#999; margin-bottom:8px; }
+  .legend-items { display:flex; flex-wrap:wrap; gap:6px; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:.7rem; color:#555; }
+  .legend-dot { width:10px; height:10px; border-radius:50%; }
+
+  #map { width:100%; height:100%; z-index:0; }
+
+  .leaflet-popup-content-wrapper {
+    border-radius:8px !important; box-shadow:0 8px 30px rgba(0,0,0,.15) !important;
+    border:none !important; padding:0 !important; overflow:hidden;
+  }
+  .leaflet-popup-content { margin:0 !important; width:230px !important; }
+  .popup-inner { padding:14px 16px; }
+  .popup-day { font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:4px; font-weight:500; }
+  .popup-name { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:700; color:var(--pine); line-height:1.2; margin-bottom:5px; }
+  .popup-desc { font-size:.72rem; color:#555; line-height:1.5; }
+  .popup-strip { height:4px; }
+  .leaflet-popup-tip { display:none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <h1>Pirineos <em>en autocaravana</em></h1>
+    <p>Madrid · Pirineo Aragonés · 5 días · Junio</p>
+  </div>
+  <div class="header-meta">
+    <strong>Miércoles → Domingo</strong><br>
+    8 paradas · ~1.000 km<br>
+    Huesca · Sobrarbe · Benasque
+  </div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+
+    <div class="legend">
+      <div class="legend-title">Leyenda</div>
+      <div class="legend-items">
+        <div class="legend-item"><div class="legend-dot" style="background:#d4863a"></div> Pueblo</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4a7c59"></div> Naturaleza</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6b9baf"></div> Pernocta</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1a3a2a"></div> Madrid</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9a4fb5"></div> 🐾 Baño perros</div>
+      </div>
+    </div>
+
+    <!-- DÍA 1 -->
+    <div class="day-block" data-day="1">
+      <div class="day-label">
+        <span class="day-badge">Día 1</span>
+        <span class="day-name">Miércoles</span>
+      </div>
+      <div class="stops-list">
+        <div class="stop-item" data-stop="0">
+          <div class="stop-marker" style="background:#1a3a2a">M</div>
+          <div class="stop-info">
+            <h4>Madrid (salida)</h4>
+            <p>Inicio del viaje · A-2 / A-138</p>
+            <span class="stop-tag tag-noche">Origen</span>
+          </div>
+        </div>
+        <div class="stop-item" data-stop="1">
+          <div class="stop-marker" style="background:#d4863a">1</div>
+          <div class="stop-info">
+            <h4>Aínsa</h4>
+            <p>Plaza Mayor medieval, castillo, vistas al Cinca y Monte Perdido</p>
+            <span class="stop-tag tag-pueblo">Pueblo</span>
+            <span class="stop-tag tag-noche">Pernocta</span>
+          </div>
+        </div>
+      </div>
+      <div class="dog-section">
+        <div class="dog-section-label">🐾 Baño para perros</div>
+        <div class="stops-list">
+          <div class="stop-item" data-dog="0">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Pozas del río Cinca</h4>
+              <p>7 zonas con aparcamiento entre Escalona y Mesón de Puértolas · Aguas turquesas</p>
+              <span class="stop-tag tag-perro">Perros OK</span>
+            </div>
+          </div>
+          <div class="stop-item" data-dog="1">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Barranco de Las Natas</h4>
+              <p>Saliendo de Aínsa hacia Campo · Poca profundidad · Muy tranquilo</p>
+              <span class="stop-tag tag-perro">Perros OK</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="route-info">🚗 ~380 km · 4h · A-2 + A-138</div>
+    </div>
+
+    <!-- DÍA 2 -->
+    <div class="day-block" data-day="2">
+      <div class="day-label">
+        <span class="day-badge">Día 2</span>
+        <span class="day-name">Jueves</span>
+      </div>
+      <div class="stops-list">
+        <div class="stop-item" data-stop="2">
+          <div class="stop-marker" style="background:#4a7c59">2</div>
+          <div class="stop-info">
+            <h4>Lagos de Batisielles</h4>
+            <p>Ruta circular 12 km · Lagos de alta montaña · Macizo de Posets</p>
+            <span class="stop-tag tag-naturaleza">Naturaleza</span>
+          </div>
+        </div>
+        <div class="stop-item" data-stop="3">
+          <div class="stop-marker" style="background:#d4863a">3</div>
+          <div class="stop-info">
+            <h4>Benasque</h4>
+            <p>Pueblo del s. XVI · Parque Natural Posets-Maladeta · Aneto</p>
+            <span class="stop-tag tag-pueblo">Pueblo</span>
+            <span class="stop-tag tag-noche">Pernocta</span>
+          </div>
+        </div>
+      </div>
+      <div class="dog-section">
+        <div class="dog-section-label">🐾 Baño para perros</div>
+        <div class="stops-list">
+          <div class="stop-item" data-dog="2">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Río Ésera · Benasque</h4>
+              <p>A pie desde el área de autocaravanas · Orillas amplias · Corriente suave en junio</p>
+              <span class="stop-tag tag-perro">Perros OK</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="route-info">🚗 ~65 km · 1h15 · A-138 + A-139</div>
+    </div>
+
+    <!-- DÍA 3 -->
+    <div class="day-block" data-day="3">
+      <div class="day-label">
+        <span class="day-badge">Día 3</span>
+        <span class="day-name">Viernes</span>
+      </div>
+      <div class="stops-list">
+        <div class="stop-item" data-stop="4">
+          <div class="stop-marker" style="background:#4a7c59">4</div>
+          <div class="stop-info">
+            <h4>Llanos del Hospital</h4>
+            <p>Centro de visitantes · Río Ésera · Rutas cortas al Ibón de Llauset</p>
+            <span class="stop-tag tag-naturaleza">Naturaleza</span>
+          </div>
+        </div>
+        <div class="stop-item" data-stop="5">
+          <div class="stop-marker" style="background:#d4863a">5</div>
+          <div class="stop-info">
+            <h4>Castejón de Sos</h4>
+            <p>Pueblo tranquilo · Mirador espectacular · Cascada de Eriste</p>
+            <span class="stop-tag tag-pueblo">Pueblo</span>
+            <span class="stop-tag tag-noche">Pernocta</span>
+          </div>
+        </div>
+      </div>
+      <div class="dog-section">
+        <div class="dog-section-label">🐾 Baño para perros</div>
+        <div class="stops-list">
+          <div class="stop-item" data-dog="3">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Pozas naturales de Benasque</h4>
+              <p>Acceso libre · Llevar con correa si hay gente · Buscar en Wikiloc "Baños Benasque con perro"</p>
+              <span class="stop-tag tag-perro">Perros OK · Con correa</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="route-info">📍 Día local · Sin desplazamiento</div>
+    </div>
+
+    <!-- DÍA 4 -->
+    <div class="day-block" data-day="4">
+      <div class="day-label">
+        <span class="day-badge">Día 4</span>
+        <span class="day-name">Sábado</span>
+      </div>
+      <div class="stops-list">
+        <div class="stop-item" data-stop="6">
+          <div class="stop-marker" style="background:#d4863a">6</div>
+          <div class="stop-info">
+            <h4>Broto</h4>
+            <p>Pueblo medieval · Puente medieval · Orillas del río Ara</p>
+            <span class="stop-tag tag-pueblo">Pueblo</span>
+          </div>
+        </div>
+        <div class="stop-item" data-stop="7">
+          <div class="stop-marker" style="background:#4a7c59">7</div>
+          <div class="stop-info">
+            <h4>Cañón de Añisclo</h4>
+            <p>Parque Nacional de Ordesa · Río Bellós · Ruta accesible con niños</p>
+            <span class="stop-tag tag-naturaleza">Naturaleza</span>
+          </div>
+        </div>
+        <div class="stop-item" data-stop="8">
+          <div class="stop-marker" style="background:#6b9baf">8</div>
+          <div class="stop-info">
+            <h4>Torla-Ordesa</h4>
+            <p>Uno de los pueblos más bonitos de Aragón · Puerta a Ordesa</p>
+            <span class="stop-tag tag-pueblo">Pueblo</span>
+            <span class="stop-tag tag-noche">Pernocta</span>
+          </div>
+        </div>
+      </div>
+      <div class="dog-section">
+        <div class="dog-section-label">🐾 Baño para perros</div>
+        <div class="stops-list">
+          <div class="stop-item" data-dog="4">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Río Ara · Broto</h4>
+              <p>Orillas naturales junto al pueblo · Sin zona señalizada · Corriente moderada</p>
+              <span class="stop-tag tag-perro">Perros OK</span>
+            </div>
+          </div>
+          <div class="stop-item" data-dog="5">
+            <div class="stop-marker" style="background:#9a4fb5;font-size:13px">🐾</div>
+            <div class="stop-info">
+              <h4>Río Bellós · Puyarruego</h4>
+              <p>Pozas laterales alejadas de la zona principal · Agua fría y cristalina</p>
+              <span class="stop-tag tag-perro">Perros OK · Zonas laterales</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="route-info">🚗 ~120 km · 2h hacia el oeste</div>
+    </div>
+
+    <!-- DÍA 5 -->
+    <div class="day-block" data-day="5">
+      <div class="day-label">
+        <span class="day-badge">Día 5</span>
+        <span class="day-name">Domingo</span>
+      </div>
+      <div class="stops-list">
+        <div class="stop-item" data-stop="8">
+          <div class="stop-marker" style="background:#6b9baf">↩</div>
+          <div class="stop-info">
+            <h4>Torla → Madrid</h4>
+            <p>Mañana tranquila en Torla · Regreso por A-23 + A-2</p>
+            <span class="stop-tag tag-noche">Regreso</span>
+          </div>
+        </div>
+      </div>
+      <div class="route-info">🚗 ~430 km · 4h30 · A-23 + A-2</div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div id="map"></div>
+</div>
+
+<!-- Leaflet loaded AFTER the DOM, BEFORE our script -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const stops = [
+  { id:0, name:"Madrid",              lat:40.4168, lng:-3.7038, day:1, dayName:"Día 1 · Miércoles", color:"#1a3a2a", label:"M",  desc:"Punto de partida. Salida por la A-2 dirección Zaragoza." },
+  { id:1, name:"Aínsa",               lat:42.4171, lng:0.1389,  day:1, dayName:"Día 1 · Miércoles", color:"#d4863a", label:"1",  desc:"Villa medieval del s. XI. Plaza Mayor porticada, castillo y vistas al Cinca y Monte Perdido. Área de autocaravanas junto al río." },
+  { id:2, name:"Lagos de Batisielles",lat:42.645,  lng:0.575,   day:2, dayName:"Día 2 · Jueves",    color:"#4a7c59", label:"2",  desc:"Ruta circular de 12 km con varios lagos de alta montaña. Vistas al macizo de Posets. Apta para niños mayores de 10 años." },
+  { id:3, name:"Benasque",            lat:42.6043, lng:0.5228,  day:2, dayName:"Día 2 · Jueves",    color:"#d4863a", label:"3",  desc:"Capital del valle. Pueblo del s. XVI al pie del Aneto (3.404 m). Parque Natural Posets-Maladeta. Área de autocaravanas bien equipada." },
+  { id:4, name:"Llanos del Hospital", lat:42.6837, lng:0.6119,  day:3, dayName:"Día 3 · Viernes",   color:"#4a7c59", label:"4",  desc:"Antiguo hospital de peregrinos del s. XII. Centro de visitantes del Parque Natural. Punto de inicio de rutas al Ibón de Llauset." },
+  { id:5, name:"Castejón de Sos",     lat:42.5122, lng:0.4918,  day:3, dayName:"Día 3 · Viernes",   color:"#d4863a", label:"5",  desc:"Pueblo tranquilo con mirador espectacular. Cerca de la Cascada de Eriste, muy accesible. Área de autocaravanas disponible." },
+  { id:6, name:"Broto",               lat:42.6048, lng:-0.1233, day:4, dayName:"Día 4 · Sábado",    color:"#d4863a", label:"6",  desc:"Pueblo con encanto a orillas del río Ara. Puente medieval y entorno muy fotogénico. A pocos kilómetros de Ordesa." },
+  { id:7, name:"Cañón de Añisclo",    lat:42.5720, lng:0.0541,  day:4, dayName:"Día 4 · Sábado",    color:"#4a7c59", label:"7",  desc:"Espectacular cañón dentro del Parque Nacional de Ordesa. Ruta por el fondo siguiendo el río Bellós. Accesible y apta para niños." },
+  { id:8, name:"Torla-Ordesa",        lat:42.6287, lng:-0.1127, day:4, dayName:"Día 4 · Sábado",    color:"#6b9baf", label:"8",  desc:"Uno de los pueblos más bonitos de Aragón. Casas de piedra oscura y vistas directas al Parque Nacional de Ordesa. Área de autocaravanas excelente." }
+];
+
+const dogSpots = [
+  { name:"Pozas del río Cinca",       lat:42.465,  lng:0.195,  dayName:"Día 1 · Zona Aínsa",   desc:"7 zonas acondicionadas con aparcamiento entre Escalona y Mesón de Puértolas. Aguas turquesas, sin zona de baño oficial. Sin restricciones para perros." },
+  { name:"Barranco de Las Natas",     lat:42.411,  lng:0.165,  dayName:"Día 1 · Zona Aínsa",   desc:"Saliendo de Aínsa en dirección a Campo, junto al túnel. Poca profundidad, agua caliente y muy tranquilo. Ideal a principios de temporada." },
+  { name:"Río Ésera · Benasque",      lat:42.598,  lng:0.518,  dayName:"Días 2-3 · Benasque",  desc:"Orillas del río Ésera a pie desde el área de autocaravanas. Amplias y accesibles, corriente suave en junio. Muy apto para perros." },
+  { name:"Pozas naturales de Benasque",lat:42.615, lng:0.535,  dayName:"Día 3 · Benasque",     desc:"Pozas naturales en el entorno del valle. Acceso libre. Llevar al perro con correa si hay más gente. Wikiloc: 'Baños Benasque con perro'." },
+  { name:"Río Ara · Broto",           lat:42.603,  lng:-0.126, dayName:"Día 4 · Broto",        desc:"Orillas naturales del río Ara junto a Broto. Sin zona de baño señalizada, corriente moderada en junio. Muy cómodo para perros grandes." },
+  { name:"Río Bellós · Puyarruego",   lat:42.540,  lng:0.042,  dayName:"Día 4 · Añisclo",      desc:"Pequeñas pozas en las zonas laterales al margen de la poza principal. Terreno rocoso, agua fría y cristalina." }
+];
+
+const routeCoords = [
+  [40.4168,-3.7038],[41.65,-0.88],[42.25,-0.05],
+  [42.4171,0.1389],[42.5122,0.4918],[42.6043,0.5228],
+  [42.6837,0.6119],[42.6043,0.5228],[42.5720,0.0541],
+  [42.6048,-0.1233],[42.6287,-0.1127]
+];
+
+const dayBounds = {
+  1:[[40.4168,-3.7038],[42.4171,0.1389]],
+  2:[[42.5,0.45],[42.72,0.65]],
+  3:[[42.48,0.45],[42.72,0.65]],
+  4:[[42.55,-0.15],[42.65,0.12]],
+  5:[[42.55,-0.20],[42.70,-0.05]]
+};
+
+// ── MAP INIT ──────────────────────────────────────────────────────────────────
+const map = L.map('map', { center:[42.3,0.2], zoom:8 });
+
+L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution:'© OpenTopoMap', maxZoom:17, opacity:0.85
+}).addTo(map);
+
+L.polyline(routeCoords, { color:'#2d5a3d', weight:3, opacity:0.6, dashArray:'8,6' }).addTo(map);
+
+// ── ICONS ─────────────────────────────────────────────────────────────────────
+function makeStopIcon(color, label) {
+  return L.divIcon({
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 34 42">
+      <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/></filter>
+      <path d="M17 2C10.1 2 4.5 7.6 4.5 14.5C4.5 24.5 17 40 17 40C17 40 29.5 24.5 29.5 14.5C29.5 7.6 23.9 2 17 2Z"
+        fill="${color}" stroke="white" stroke-width="2" filter="url(#sh)"/>
+      <text x="17" y="19" text-anchor="middle" dominant-baseline="middle"
+        fill="white" font-size="11" font-weight="700" font-family="sans-serif">${label}</text>
+    </svg>`,
+    iconSize:[34,42], iconAnchor:[17,42], popupAnchor:[0,-44], className:''
+  });
+}
+
+function makeDogIcon() {
+  return L.divIcon({
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <filter id="ds"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.35"/></filter>
+      <circle cx="16" cy="16" r="14" fill="#9a4fb5" stroke="white" stroke-width="2" filter="url(#ds)"/>
+      <text x="16" y="21" text-anchor="middle" font-size="14">🐾</text>
+    </svg>`,
+    iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-18], className:''
+  });
+}
+
+// ── MARKERS ───────────────────────────────────────────────────────────────────
+const markers = stops.map((s, i) => {
+  const m = L.marker([s.lat, s.lng], { icon: makeStopIcon(s.color, s.label) }).addTo(map);
+  m.bindPopup(`
+    <div class="popup-strip" style="background:${s.color}"></div>
+    <div class="popup-inner">
+      <div class="popup-day" style="color:${s.color}">${s.dayName}</div>
+      <div class="popup-name">${s.name}</div>
+      <div class="popup-desc">${s.desc}</div>
+    </div>`, { maxWidth:240 });
+  m.on('click', () => highlightStop(i));
+  return m;
+});
+
+const dogMarkers = dogSpots.map(s => {
+  const m = L.marker([s.lat, s.lng], { icon: makeDogIcon() }).addTo(map);
+  m.bindPopup(`
+    <div class="popup-strip" style="background:#9a4fb5"></div>
+    <div class="popup-inner">
+      <div class="popup-day" style="color:#9a4fb5">🐾 Baño canino · ${s.dayName}</div>
+      <div class="popup-name">${s.name}</div>
+      <div class="popup-desc">${s.desc}</div>
+    </div>`, { maxWidth:250 });
+  return m;
+});
+
+// ── INTERACTIONS ──────────────────────────────────────────────────────────────
+function highlightStop(idx) {
+  document.querySelectorAll('.stop-item').forEach(el => el.classList.remove('highlighted'));
+  const el = document.querySelector(`.stop-item[data-stop="${idx}"]`);
+  if (el) { el.classList.add('highlighted'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+// Stop items → fly to marker
+document.querySelectorAll('.stop-item[data-stop]').forEach(el => {
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const idx = parseInt(el.dataset.stop);
+    map.setView([stops[idx].lat, stops[idx].lng], 12, { animate:true });
+    markers[idx].openPopup();
+    highlightStop(idx);
+  });
+});
+
+// Dog items → fly to dog marker
+document.querySelectorAll('.stop-item[data-dog]').forEach(el => {
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const idx = parseInt(el.dataset.dog);
+    map.setView([dogSpots[idx].lat, dogSpots[idx].lng], 13, { animate:true });
+    dogMarkers[idx].openPopup();
+  });
+});
+
+// Day blocks → fit bounds
+document.querySelectorAll('.day-block[data-day]').forEach(el => {
+  el.addEventListener('click', () => {
+    const day = parseInt(el.dataset.day);
+    document.querySelectorAll('.day-block').forEach(d => d.classList.remove('active'));
+    el.classList.add('active');
+    if (dayBounds[day]) map.fitBounds(dayBounds[day], { padding:[40,40], animate:true });
+  });
+});
+
+// Initial fit
+setTimeout(() => {
+  map.fitBounds(stops.map(s => [s.lat, s.lng]), { padding:[30,30] });
+}, 200);
+</script>
+</body>
+</html>
