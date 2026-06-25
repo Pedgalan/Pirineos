@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mi Diario de Ruta</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #1C2B3A;
+    --slate: #2E4057;
+    --sand: #E8DCC8;
+    --sand-light: #F5EFE4;
+    --pine: #4A7C59;
+    --pine-light: #6BA880;
+    --sunset: #E8854A;
+    --sunset-light: #F4A96E;
+    --text: #2C2416;
+    --text-muted: #7A6E63;
+    --white: #FFFFFF;
+    --radius: 16px;
+    --shadow: 0 4px 20px rgba(28,43,58,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--sand-light);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 100px;
+  }
+
+  /* ─── HEADER ─── */
+  .app-header {
+    background: var(--night);
+    padding: 52px 20px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .route-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .route-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+    transition: background 0.4s;
+  }
+  .route-dot.filled { background: var(--sunset); }
+  .route-dot.active { background: var(--sunset-light); box-shadow: 0 0 0 3px rgba(232,133,74,0.3); }
+
+  .route-line {
+    flex: 1;
+    height: 2px;
+    background: var(--slate);
+    position: relative;
+    overflow: hidden;
+  }
+  .route-line-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--sunset), var(--sunset-light));
+    transition: width 0.6s ease;
+  }
+
+  .header-titles {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .trip-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--sand);
+    line-height: 1.2;
+  }
+
+  .trip-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .day-counter {
+    text-align: right;
+  }
+
+  .day-counter .num {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    color: var(--sunset);
+    line-height: 1;
+  }
+
+  .day-counter .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ─── MAIN ─── */
+  .main { padding: 16px; }
+
+  /* ─── NEW ENTRY BUTTON ─── */
+  .btn-new-entry {
+    width: 100%;
+    background: var(--sunset);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 15px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(232,133,74,0.35);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .btn-new-entry:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(232,133,74,0.25); }
+
+  .btn-icon { font-size: 20px; }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(28,43,58,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--white);
+    border-radius: 24px 24px 0 0;
+    padding: 24px 20px 40px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: #DDD;
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--night);
+    margin-bottom: 20px;
+  }
+
+  .form-group { margin-bottom: 16px; }
+
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    background: var(--sand-light);
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .form-input:focus, .form-textarea:focus, .form-select:focus {
+    border-color: var(--sunset);
+  }
+  .form-textarea { resize: none; min-height: 100px; line-height: 1.6; }
+
+  .photo-upload-area {
+    border: 2px dashed #CCC;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .photo-upload-area:active { border-color: var(--sunset); }
+  .photo-upload-area .upload-icon { font-size: 32px; margin-bottom: 6px; }
+  .photo-upload-area .upload-text { font-size: 14px; color: var(--text-muted); }
+  .photo-upload-area input { display: none; }
+
+  .photo-preview-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 8px 0;
+    scrollbar-width: none;
+  }
+  .photo-preview-strip::-webkit-scrollbar { display: none; }
+
+  .photo-thumb {
+    position: relative;
+    flex-shrink: 0;
+    width: 80px; height: 80px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-thumb .remove-photo {
+    position: absolute; top: 4px; right: 4px;
+    width: 20px; height: 20px;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  .mood-selector {
+    display: flex;
+    gap: 8px;
+  }
+  .mood-btn {
+    flex: 1;
+    background: var(--sand-light);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 10px 4px;
+    font-size: 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .mood-btn.selected { border-color: var(--sunset); background: rgba(232,133,74,0.1); }
+
+  .btn-save {
+    width: 100%;
+    background: var(--pine);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 15px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: transform 0.1s;
+  }
+  .btn-save:active { transform: scale(0.98); }
+
+  .btn-cancel {
+    width: 100%;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  /* ─── ENTRIES ─── */
+  .entries-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .day-group {}
+
+  .day-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+
+  .day-badge {
+    background: var(--night);
+    color: var(--sand);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .day-line { flex: 1; height: 1px; background: #DDD; }
+
+  .entry-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .entry-card-header {
+    padding: 14px 16px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .entry-location {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    color: var(--night);
+    font-style: italic;
+    line-height: 1.3;
+    flex: 1;
+  }
+
+  .entry-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+  }
+
+  .entry-time {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .entry-mood { font-size: 18px; }
+
+  .entry-notes {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0 16px 14px;
+  }
+
+  .entry-photos {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0 0 0 0;
+  }
+  .entry-photos::-webkit-scrollbar { display: none; }
+
+  .entry-photo {
+    flex-shrink: 0;
+    height: 160px;
+    width: auto;
+    min-width: 120px;
+    max-width: 220px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+  .entry-photo:first-child { border-radius: 0; }
+
+  .entry-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    border-top: 1px solid var(--sand);
+  }
+
+  .entry-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 11px;
+    color: var(--pine);
+    background: rgba(74,124,89,0.1);
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .btn-delete-entry {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    padding: 4px;
+  }
+  .btn-delete-entry:active { opacity: 1; }
+
+  /* ─── EMPTY STATE ─── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+  }
+  .empty-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.6; }
+  .empty-title { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--night); margin-bottom: 8px; }
+  .empty-text { font-size: 14px; line-height: 1.6; }
+
+  /* ─── LIGHTBOX ─── */
+  .lightbox {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .lightbox.open { opacity: 1; pointer-events: all; }
+  .lightbox img {
+    max-width: 95vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  .lightbox-close {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    font-size: 22px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ─── EXPORT ─── */
+  .export-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    padding: 12px 16px 28px;
+    border-top: 1px solid var(--sand);
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-export {
+    flex: 1;
+    background: var(--night);
+    color: var(--sand);
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-export:active { background: var(--slate); }
+
+  /* ─── STEP TAGS INPUT ─── */
+  .tags-input-wrap {
+    display: flex;
+    gap: 8px;
+  }
+  .tags-input-wrap .form-input { flex: 1; }
+  .btn-add-tag {
+    background: var(--pine);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .tag-list-edit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .tag-edit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(74,124,89,0.1);
+    color: var(--pine);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .tag-edit button {
+    background: none;
+    border: none;
+    color: var(--pine);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 0 1px;
+  }
+
+  .section-divider {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 20px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--sand);
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="route-bar" id="routeBar"></div>
+  <div class="header-titles">
+    <div>
+      <div class="trip-title" id="tripTitle">Pirineos en autocaravana</div>
+      <div class="trip-subtitle" id="tripDates">Junio 2026 · Diario de ruta</div>
+    </div>
+    <div class="day-counter">
+      <div class="num" id="entryCount">0</div>
+      <div class="label">entradas</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <button class="btn-new-entry" onclick="openModal()">
+    <span class="btn-icon">✏️</span>
+    Añadir momento
+  </button>
+  <div class="entries-list" id="entriesList"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nuevo momento</div>
+
+    <div class="form-group">
+      <label class="form-label">📍 Lugar</label>
+      <input class="form-input" id="inputLocation" placeholder="¿Dónde estás?" autocomplete="off">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">📅 Día del viaje</label>
+      <select class="form-select" id="inputDay">
+        <option value="1">Día 1</option>
+        <option value="2">Día 2</option>
+        <option value="3">Día 3</option>
+        <option value="4">Día 4</option>
+        <option value="5">Día 5</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">😊 Ambiente</label>
+      <div class="mood-selector" id="moodSelector">
+        <button class="mood-btn" data-mood="😍" onclick="selectMood(this)">😍</button>
+        <button class="mood-btn" data-mood="😄" onclick="selectMood(this)">😄</button>
+        <button class="mood-btn" data-mood="😌" onclick="selectMood(this)">😌</button>
+        <button class="mood-btn" data-mood="🤩" onclick="selectMood(this)">🤩</button>
+        <button class="mood-btn" data-mood="😴" onclick="selectMood(this)">😴</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">📝 Notas</label>
+      <textarea class="form-textarea" id="inputNotes" placeholder="Cuéntate qué ha pasado…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">🏷️ Etiquetas</label>
+      <div class="tags-input-wrap">
+        <input class="form-input" id="inputTag" placeholder="paisaje, comida, anécdota…" onkeydown="handleTagKey(event)">
+        <button class="btn-add-tag" onclick="addTag()">+</button>
+      </div>
+      <div class="tag-list-edit" id="tagListEdit"></div>
+    </div>
+
+    <div class="section-divider">Fotos</div>
+
+    <div class="form-group">
+      <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">Toca para añadir fotos</div>
+        <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotos(event)">
+      </div>
+      <div class="photo-preview-strip" id="photoPreviewStrip"></div>
+    </div>
+
+    <button class="btn-save" onclick="saveEntry()">Guardar momento</button>
+    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- EXPORT BAR -->
+<div class="export-bar">
+  <button class="btn-export" onclick="exportJSON()">💾 Guardar copia</button>
+  <button class="btn-export" onclick="importJSON()">📂 Recuperar</button>
+  <input type="file" id="importInput" accept=".json" style="display:none" onchange="handleImport(event)">
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let entries = JSON.parse(localStorage.getItem('roadtrip_entries') || '[]');
+let currentPhotos = []; // base64 strings
+let currentTags = [];
+let selectedMood = '';
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  render();
+  updateHeader();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  const list = document.getElementById('entriesList');
+
+  if (entries.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🚐</div>
+        <div class="empty-title">El viaje empieza aquí</div>
+        <div class="empty-text">Añade tu primer momento<br>y empieza a construir tu diario de ruta.</div>
+      </div>`;
+    return;
+  }
+
+  // Group by day
+  const byDay = {};
+  entries.forEach(e => {
+    const d = e.day || 1;
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(e);
+  });
+
+  const days = Object.keys(byDay).sort((a,b) => Number(a)-Number(b));
+  list.innerHTML = days.map(day => {
+    const dayEntries = byDay[day];
+    return `
+      <div class="day-group">
+        <div class="day-header">
+          <div class="day-badge">Día ${day}</div>
+          <div class="day-line"></div>
+        </div>
+        ${dayEntries.map(e => renderEntry(e)).join('')}
+      </div>`;
+  }).join('');
+}
+
+function renderEntry(e) {
+  const photosHTML = e.photos && e.photos.length > 0
+    ? `<div class="entry-photos">${e.photos.map(p =>
+        `<img class="entry-photo" src="${p}" onclick="openLightbox('${p}')" loading="lazy">`
+      ).join('')}</div>`
+    : '';
+
+  const tagsHTML = e.tags && e.tags.length > 0
+    ? `<div class="entry-tags">${e.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>`
+    : '<div></div>';
+
+  return `
+    <div class="entry-card" data-id="${e.id}">
+      <div class="entry-card-header">
+        <div class="entry-location">${e.location || 'Sin ubicación'}</div>
+        <div class="entry-meta">
+          <span class="entry-time">${e.time}</span>
+          <span class="entry-mood">${e.mood || ''}</span>
+        </div>
+      </div>
+      ${e.notes ? `<div class="entry-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : ''}
+      ${photosHTML}
+      <div class="entry-footer">
+        ${tagsHTML}
+        <button class="btn-delete-entry" onclick="deleteEntry('${e.id}')">🗑</button>
+      </div>
+    </div>`;
+}
+
+function updateHeader() {
+  document.getElementById('entryCount').textContent = entries.length;
+
+  // Route bar: 5 days
+  const bar = document.getElementById('routeBar');
+  const daysUsed = new Set(entries.map(e => e.day));
+  let html = '';
+  for (let d = 1; d <= 5; d++) {
+    const filled = daysUsed.has(String(d)) || daysUsed.has(d);
+    const active = filled && d === Math.max(...[...daysUsed].map(Number));
+    html += `<div class="route-dot ${filled ? 'filled' : ''} ${active ? 'active' : ''}"></div>`;
+    if (d < 5) {
+      const pct = filled ? '100' : '0';
+      html += `<div class="route-line"><div class="route-line-fill" style="width:${filled ? 100 : 0}%"></div></div>`;
+    }
+  }
+  bar.innerHTML = html;
+
+  // Dates
+  if (entries.length > 0) {
+    const first = entries[0];
+    document.getElementById('tripTitle').textContent = entries[0].location
+      ? `Desde ${entries[0].location.split(',')[0]}`
+      : 'Mi Viaje';
+  }
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openModal() {
+  currentPhotos = [];
+  currentTags = [];
+  selectedMood = '';
+  document.getElementById('inputLocation').value = '';
+  document.getElementById('inputNotes').value = '';
+  document.getElementById('inputTag').value = '';
+  document.getElementById('photoPreviewStrip').innerHTML = '';
+  document.getElementById('tagListEdit').innerHTML = '';
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('inputLocation').focus(), 400);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+// ─── MOOD ─────────────────────────────────────────────────────────────────────
+function selectMood(btn) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedMood = btn.dataset.mood;
+}
+
+// ─── TAGS ─────────────────────────────────────────────────────────────────────
+function handleTagKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+}
+
+function addTag() {
+  const input = document.getElementById('inputTag');
+  const val = input.value.trim();
+  if (val && !currentTags.includes(val)) {
+    currentTags.push(val);
+    renderTagsEdit();
+    input.value = '';
+  }
+}
+
+function removeTag(tag) {
+  currentTags = currentTags.filter(t => t !== tag);
+  renderTagsEdit();
+}
+
+function renderTagsEdit() {
+  document.getElementById('tagListEdit').innerHTML = currentTags.map(t =>
+    `<span class="tag-edit">${t}<button onclick="removeTag('${t}')">×</button></span>`
+  ).join('');
+}
+
+// ─── PHOTOS ───────────────────────────────────────────────────────────────────
+function handlePhotos(event) {
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      currentPhotos.push(e.target.result);
+      renderPhotoPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+  event.target.value = '';
+}
+
+function renderPhotoPreview() {
+  const strip = document.getElementById('photoPreviewStrip');
+  strip.innerHTML = currentPhotos.map((p, i) => `
+    <div class="photo-thumb">
+      <img src="${p}" alt="">
+      <button class="remove-photo" onclick="removePhoto(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removePhoto(idx) {
+  currentPhotos.splice(idx, 1);
+  renderPhotoPreview();
+}
+
+// ─── SAVE ─────────────────────────────────────────────────────────────────────
+function saveEntry() {
+  const location = document.getElementById('inputLocation').value.trim();
+  const notes = document.getElementById('inputNotes').value.trim();
+  const day = document.getElementById('inputDay').value;
+
+  if (!location && !notes && currentPhotos.length === 0) {
+    document.getElementById('inputLocation').focus();
+    return;
+  }
+
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  const entry = {
+    id: Date.now().toString(),
+    day,
+    location,
+    notes,
+    mood: selectedMood,
+    tags: [...currentTags],
+    photos: [...currentPhotos],
+    time,
+    ts: now.toISOString()
+  };
+
+  entries.push(entry);
+  save();
+  closeModal();
+  render();
+  updateHeader();
+}
+
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+function deleteEntry(id) {
+  if (!confirm('¿Borrar esta entrada?')) return;
+  entries = entries.filter(e => e.id !== id);
+  save();
+  render();
+  updateHeader();
+}
+
+// ─── PERSIST ──────────────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('roadtrip_entries', JSON.stringify(entries));
+}
+
+// ─── LIGHTBOX ─────────────────────────────────────────────────────────────────
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ─── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+function exportJSON() {
+  const data = JSON.stringify(entries, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON() {
+  document.getElementById('importInput').click();
+}
+
+function handleImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (Array.isArray(imported)) {
+        if (entries.length > 0) {
+          if (!confirm(`¿Combinar con tus ${entries.length} entradas actuales? (Acepta = combinar, Cancela = reemplazar)`)) {
+            entries = imported;
+          } else {
+            // Merge avoiding duplicates by id
+            const existingIds = new Set(entries.map(e => e.id));
+            imported.forEach(e => { if (!existingIds.has(e.id)) entries.push(e); });
+          }
+        } else {
+          entries = imported;
+        }
+        save();
+        render();
+        updateHeader();
+        alert(`✅ ${imported.length} entradas cargadas`);
+      }
+    } catch {
+      alert('Error al leer el archivo.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
