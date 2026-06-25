@@ -626,6 +626,13 @@
       <div class="tag-list-edit" id="tagListEdit"></div>
     </div>
 
+    <div class="section-divider">Vídeo</div>
+
+    <div class="form-group">
+      <label class="form-label">🎬 Link del vídeo (iCloud, Google Fotos, YouTube…)</label>
+      <input class="form-input" id="inputVideo" placeholder="https://..." autocomplete="off" inputmode="url">
+    </div>
+
     <div class="section-divider">Fotos</div>
 
     <div class="form-group">
@@ -726,6 +733,7 @@ function renderEntry(e) {
       </div>
       ${e.notes ? `<div class="entry-notes">${e.notes.replace(/\n/g,'<br>')}</div>` : ''}
       ${photosHTML}
+      ${e.videoUrl ? `<div style="padding:10px 16px 4px"><a href="${e.videoUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#1C2B3A;color:#E8DCC8;text-decoration:none;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:500;">▶ Ver vídeo</a></div>` : ''}
       <div class="entry-footer">
         ${tagsHTML}
         <button class="btn-delete-entry" onclick="deleteEntry('${e.id}')">🗑</button>
@@ -768,6 +776,7 @@ function openModal() {
   document.getElementById('inputLocation').value = '';
   document.getElementById('inputNotes').value = '';
   document.getElementById('inputTag').value = '';
+  document.getElementById('inputVideo').value = '';
   document.getElementById('photoPreviewStrip').innerHTML = '';
   document.getElementById('tagListEdit').innerHTML = '';
   document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
@@ -849,6 +858,7 @@ function saveEntry() {
   const location = document.getElementById('inputLocation').value.trim();
   const notes = document.getElementById('inputNotes').value.trim();
   const day = document.getElementById('inputDay').value;
+  const videoUrl = document.getElementById('inputVideo').value.trim();
 
   if (!location && !notes && currentPhotos.length === 0) {
     alert('Añade al menos un lugar o una nota.');
@@ -866,6 +876,7 @@ function saveEntry() {
     mood: selectedMood,
     tags: [...currentTags],
     photos: [...currentPhotos],
+    videoUrl,
     time,
     ts: now.toISOString()
   };
