@@ -657,7 +657,7 @@
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-let entries = JSON.parse(localStorage.getItem('roadtrip_entries') || '[]');
+let entries = (() => { try { return JSON.parse(localStorage.getItem('roadtrip_entries') || '[]'); } catch(e) { return []; } })();
 let currentPhotos = []; // base64 strings
 let currentTags = [];
 let selectedMood = '';
@@ -851,7 +851,7 @@ function saveEntry() {
   const day = document.getElementById('inputDay').value;
 
   if (!location && !notes && currentPhotos.length === 0) {
-    document.getElementById('inputLocation').focus();
+    alert('Añade al menos un lugar o una nota.');
     return;
   }
 
@@ -861,7 +861,7 @@ function saveEntry() {
   const entry = {
     id: Date.now().toString(),
     day,
-    location,
+    location: location || 'Sin ubicación',
     notes,
     mood: selectedMood,
     tags: [...currentTags],
@@ -871,7 +871,7 @@ function saveEntry() {
   };
 
   entries.push(entry);
-  save();
+  persist();
   closeModal();
   render();
   updateHeader();
@@ -881,14 +881,18 @@ function saveEntry() {
 function deleteEntry(id) {
   if (!confirm('¿Borrar esta entrada?')) return;
   entries = entries.filter(e => e.id !== id);
-  save();
+  persist();
   render();
   updateHeader();
 }
 
 // ─── PERSIST ──────────────────────────────────────────────────────────────────
-function save() {
-  localStorage.setItem('roadtrip_entries', JSON.stringify(entries));
+function persist() {
+  try {
+    localStorage.setItem('roadtrip_entries', JSON.stringify(entries));
+  } catch(e) {
+    console.warn('localStorage no disponible:', e);
+  }
 }
 
 // ─── LIGHTBOX ─────────────────────────────────────────────────────────────────
