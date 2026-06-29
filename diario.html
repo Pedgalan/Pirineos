@@ -926,17 +926,12 @@ function exportJSON(withPhotos) {
       }));
   const data = JSON.stringify(payload, null, 2);
   const suffix = withPhotos ? '-con-fotos' : '';
-  const blob = new Blob([data], { type: 'application/json' });
-  const reader = new FileReader();
-  reader.onload = function() {
-    const a = document.createElement('a');
-    a.href = reader.result;
-    a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + suffix + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-  reader.readAsDataURL(blob);
+  // En Safari iOS la única forma fiable para archivos grandes es abrir en nueva pestaña
+  const blob = new Blob([data], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  // El usuario verá el JSON en pantalla → pulsar compartir → Guardar en Archivos
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function importJSON() {
