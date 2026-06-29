@@ -657,7 +657,8 @@
 
 <!-- EXPORT BAR -->
 <div class="export-bar">
-  <button class="btn-export" onclick="exportJSON()">💾 Guardar copia</button>
+  <button class="btn-export" onclick="exportJSON(false)">💾 Copia rápida</button>
+  <button class="btn-export" onclick="exportJSON(true)" style="background:var(--pine)">📷 Con fotos</button>
   <button class="btn-export" onclick="importJSON()">📂 Recuperar</button>
   <input type="file" id="importInput" accept=".json" style="display:none" onchange="handleImport(event)">
 </div>
@@ -916,19 +917,21 @@ function closeLightbox() {
 }
 
 // ─── EXPORT / IMPORT ──────────────────────────────────────────────────────────
-function exportJSON() {
-  // Sin fotos base64 — el JSON pesa KB en lugar de MB, Safari no se cuelga
-  const lightweight = entries.map(e => ({
-    ...e,
-    photos: e.photos.map(p => p.startsWith('data:') ? '__foto_en_carrete__' : p)
-  }));
-  const data = JSON.stringify(lightweight, null, 2);
+function exportJSON(withPhotos) {
+  const payload = withPhotos
+    ? entries
+    : entries.map(e => ({
+        ...e,
+        photos: e.photos.map(p => p.startsWith('data:') ? '__foto_en_carrete__' : p)
+      }));
+  const data = JSON.stringify(payload, null, 2);
+  const suffix = withPhotos ? '-con-fotos' : '';
   const blob = new Blob([data], { type: 'application/json' });
   const reader = new FileReader();
   reader.onload = function() {
     const a = document.createElement('a');
     a.href = reader.result;
-    a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + '.json';
+    a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + suffix + '.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
