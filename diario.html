@@ -917,14 +917,23 @@ function closeLightbox() {
 
 // ─── EXPORT / IMPORT ──────────────────────────────────────────────────────────
 function exportJSON() {
-  const data = JSON.stringify(entries, null, 2);
+  // Sin fotos base64 — el JSON pesa KB en lugar de MB, Safari no se cuelga
+  const lightweight = entries.map(e => ({
+    ...e,
+    photos: e.photos.map(p => p.startsWith('data:') ? '__foto_en_carrete__' : p)
+  }));
+  const data = JSON.stringify(lightweight, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  const reader = new FileReader();
+  reader.onload = function() {
+    const a = document.createElement('a');
+    a.href = reader.result;
+    a.download = 'diario-viaje-' + new Date().toISOString().split('T')[0] + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  reader.readAsDataURL(blob);
 }
 
 function importJSON() {
